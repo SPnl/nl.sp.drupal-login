@@ -1,0 +1,8 @@
+name = SP Drupal-Login
+description = Aanpassingen in de loginprocedure voor SPnet
+version = 1.0
+core = 7.x
+package = sprbs
+dependencies[] = civicrm
+dependencies[] = me
+dependencies[] = sharedemail

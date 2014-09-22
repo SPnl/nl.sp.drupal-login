@@ -1,0 +1,344 @@
+<?php
+/*  --------------------------------------------------------------------------
+ * Aanpassingen aan de Drupal-loginprocedure voor SPnet
+ * - Redirect automatisch naar login-pagina / homepage
+ * - Geeft mogelijkheid account aan te maken door koppeling met CiviCRM
+ * kevin@levity.nl, 2014
+ * -------------------------------------------------------------------------- */
+
+// Redirect naar login bij access denied
+
+function splogin_page_delivery_callback_alter(&$callback, $set = false) {
+    if($callback == 'drupal_deliver_html_page') {
+        $callback = 'splogin_deliver_html_page';
+    }
+}
+
+function splogin_deliver_html_page($page_callback_result) {
+
+    if(is_int($page_callback_result)) {
+        switch ($page_callback_result) {
+
+            case MENU_ACCESS_DENIED:
+                if(!user_is_logged_in())
+                    drupal_goto('user');
+                break;
+
+        }
+    }
+
+    return drupal_deliver_html_page($page_callback_result);
+}
+
+// Redirect naar voorpagina ipv /user na login
+
+function splogin_user_login(&$edit, $account) {
+    if(!isset($_POST['form_id']) || $_POST['form_id'] != 'user_pass_reset') {
+        $_GET['destination'] = '';
+    }
+}
+
+// Custom-pagina /user/new
+
+function splogin_menu() {
+    return array(
+        'user/new' => array(
+            'title'           => 'Nieuw account aanmaken',
+            'page callback'   => 'splogin_new',
+            'access callback' => true,
+        ),
+    );
+}
+
+function splogin_new() {
+    if(user_is_logged_in())
+        return drupal_goto('user');
+    else
+        return drupal_get_form('splogin_new_form');
+}
+
+// Formulierfuncties
+
+function splogin_new_form($form, &$form_state) {
+
+    if(!isset($form_state['stage']))
+        $form_state['stage'] = 'start';
+
+    switch ($form_state['stage']) {
+
+        case 'start':
+
+            $form['descr'] = array(
+                '#markup' => t('<h3>Nieuw account</h3><p>Voer uw lidnummer of relatienummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>'),
+            );
+            $form['civicrm_id'] = array(
+                '#type'  => 'textfield',
+                '#title' => t('Relatienummer'),
+            );
+            $form['postcode'] = array(
+                '#type'  => 'textfield',
+                '#title' => t('Postcode'),
+            );
+            $form['birthdate'] = array(
+                '#type'          => 'date',
+                '#title'         => t('Geboortedatum'),
+                '#default_value' => array(
+                    'day'   => 1,
+                    'month' => 1,
+                    'year'  => date('Y'),
+                ),
+            );
+            $form['submit'] = array(
+                '#type'  => 'submit',
+                '#value' => t('Verder'),
+            );
+
+            break;
+
+        case 'email':
+
+            $form['descr'] = array(
+                '#markup' => t('<h3>Nieuw account</h3><p>U bent bekend in ons systeem, maar we hebben nog geen e-mailadres van u opgeslagen. Vul hieronder uw e-mailadres in.</p>'),
+            );
+            $form['email'] = array(
+                '#type'  => 'textfield',
+                '#title' => t('E-mail'),
+            );
+            $form['submit'] = array(
+                '#type'  => 'submit',
+                '#value' => t('Account aanmaken'),
+            );
+
+            break;
+
+        case 'complete':
+
+            $form['descr'] = array(
+                '#markup' => t('<h3>Nieuw account</h3><p>Bedankt voor het aanmaken van uw account. U ontvangt nu een e-mail met een eenmalige link. Als u deze aanklikt kunt u inloggen op SPnet en uw wachtwoord instellen.</p>'),
+            );
+
+            break;
+
+    }
+
+    return $form;
+}
+
+function splogin_new_get_fields(&$form_state) {
+
+    // Velden ophalen en parsen vanuit het formulier
+
+    if(isset($form_state['values']['civicrm_id']))
+        $form_state['multistep_values']['civicrm_id'] = $form_state['values']['civicrm_id'];
+
+    if(isset($form_state['values']['postcode'])) {
+        $postcode = $form_state['values']['postcode'];
+        if(strlen($postcode) == 6 && preg_match('/^[0-9]{4}[A-Za-z]{2}$/', $postcode))
+            $postcode = substr($postcode, 0, 4) . ' ' . substr($postcode, 4);
+        $postcode = strtoupper($postcode);
+        $form_state['multistep_values']['postcode'] = $postcode;
+    }
+
+    if(isset($form_state['values']['birthdate'])) {
+        $form_state['multistep_values']['birthdate'] = mktime(0, 0, 0, $form_state['values']['birthdate']['month'], $form_state['values']['birthdate']['day'], $form_state['values']['birthdate']['year']);
+    }
+
+    if(isset($form_state['values']['email'])) {
+        $form_state['multistep_values']['email'] = $form_state['values']['email'];
+    }
+
+    return $form_state['multistep_values'];
+}
+
+function splogin_new_form_validate($form, &$form_state) {
+
+    // Validatie voor nieuwe registratie
+
+    $fields = splogin_new_get_fields($form_state);
+
+    switch ($form_state['stage']) {
+
+        case 'start':
+
+            // Controleer invoer
+
+            if(!$fields['civicrm_id'] || (int)$fields['civicrm_id'] < 1 || (int)$fields['civicrm_id'] > 1000000)
+                form_set_error('civicrm_id', 'Ongeldig relatienummer');
+            if(!$fields['postcode'])
+                form_set_error('postcode', 'Geen postcode ingevuld.');
+            if($fields['birthdate'] === false || $fields['birthdate'] > time() - 12 * 365 * 86400)
+                form_set_error('birthdate', 'Ongeldige geboortedatum.');
+
+            break;
+
+        case 'email':
+
+            // Controleer wachtwoord-invoer
+
+            if(!$fields['email'])
+                form_set_error('email', 'Vul een geldig e-mailadres in.');
+            break;
+    }
+}
+
+function splogin_new_form_submit($form, &$form_state) {
+
+    // Formulier verzenden
+
+    $fields = splogin_new_get_fields($form_state);
+    list($contact, $status) = _splogin_new_checkuser($fields);
+    $addAccount = false;
+
+    switch ($form_state['stage']) {
+
+        case 'start':
+
+            // Controleer of gebruiker al bestaat
+            // Zo ja -> account aanmaken (maar eventueel eerst om e-mailadres vragen)
+
+            if(!$contact) {
+                form_set_error('civicrm_id', $status);
+            } else {
+
+                if(!$contact['email']) {
+                    $form_state['stage'] = 'email';
+                    $form_state['rebuild'] = true;
+                } else {
+                    $addAccount = true;
+                }
+            }
+
+            break;
+
+        case 'email':
+
+            // Gebruiker bestaat maar heeft geen geldig emailadres
+            // -> Email updaten + account aanmaken
+
+            if(!$contact) {
+                form_set_error('civicrm_id', 'Er is een fout opgetreden: relatie niet gevonden.');
+            } else {
+
+                _splogin_new_setemail($contact, $fields['email']);
+                $contact['email'] = $fields['email'];
+                $addAccount = true;
+            }
+
+            break;
+    }
+
+    // Account aanmaken
+    if($addAccount) {
+
+        if(!$contact) {
+            form_set_error('civicrm_id', 'Er is een fout opgetreden: relatie niet gevonden.');
+        } else {
+
+            // Gegevens kloppen -> Drupal-account aanmaken
+            _splogin_new_createaccount($contact, $fields);
+
+            // Melding 'klaar' tonen
+            $form_state['stage'] = 'complete';
+            $form_state['rebuild'] = true;
+        }
+    }
+}
+
+// Koppeling met CiviCRM
+
+function _splogin_new_checkuser($fields) {
+
+    // Controleer of gebruiker al bestaat
+
+    civicrm_initialize();
+
+    $user_check = civicrm_api3('UFMatch', 'Get', array(
+        'contact_id' => $fields['civicrm_id'],
+    ));
+
+    if($user_check && $user_check['count'] > 0) {
+        return array(false, 'Er bestaat al een gebruiker voor deze relatie.<br /><a href="' . url('user') . '">Log hier in.</a>');
+    }
+
+    // Haal contact op en controleer of de gegevens kloppen
+
+    $contact = civicrm_api3('Contact', 'Get', array(
+        'id'         => $fields['civicrm_id'],
+        'sequential' => true,
+    ));
+
+    if(!$contact || $contact['count'] == 0) {
+        return array(false, 'Geen relatie met deze gegevens gevonden.<br />Lukt het niet om een account aan te maken, bel dan met 088-243 55 40.');
+    }
+
+    // drupal_set_message(print_r($contact, true));
+
+    $contact = array_shift($contact['values']);
+    if($contact['postal_code'] != $fields['postcode'] || ($contact['birth_date'] != null && strtotime($contact['birth_date']) != $fields['birthdate'])) {
+        return array(false, 'Geen relatie met deze gegevens gevonden<br />Lukt het niet om een account aan te maken, bel dan met 088-243 55 40.');
+    }
+
+    return array($contact, true);
+}
+
+function _splogin_new_createaccount($contact, $fields) {
+
+    // Voeg Drupal-account toe
+    $account = user_save('', array(
+        'name'   => $contact['contact_id'],
+        'mail'   => $contact['email'],
+        'pass'   => $fields['password'],
+        'status' => 1,
+        'init'   => 'email address',
+        'roles'  => array(
+            DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+        ),
+    ));
+    $account->password = $fields['password'];
+
+    // CiviCRM gaat nu automatisch een UFMatch-record toevoegen obv email. Maar wij zitten vaak met dubbele mailadressen. Die hook kan niet echt uit lijkt het, dus indien nodig vervangen we hem zelf door een correcte. (Volgens mij gaat dit nu goed en lost dit ism de sharedemail-module de problemen rond dit punt op.)
+    $ufmatch = civicrm_api3('UFMatch', 'get', array(
+        'contact_id' => $contact['contact_id'],
+    ));
+    if($ufmatch['count'] > 0) {
+        $ufmrecord = array_shift($ufmatch['values']);
+        if($ufmrecord && $ufmrecord['uf_id'] != $account->uid) {
+
+            $res = civicrm_api3('UFMatch', 'delete', array(
+                'id' => $ufmrecord['id'],
+            ));
+            $res = civicrm_api3('UFMatch', 'create', array(
+                'uf_id'      => $account->uid,
+                'uf_name'    => $contact['contact_id'],
+                'contact_id' => $contact['contact_id'],
+            ));
+        }
+    } else {
+
+        $res = civicrm_api3('UFMatch', 'create', array(
+            'uf_id'      => $account->uid,
+            'uf_name'    => $contact['contact_id'],
+            'contact_id' => $contact['contact_id'],
+        ));
+    }
+
+    // E-mailbevestiging + loginlink versturen
+    drupal_mail('user', 'register_no_approval_required', $contact['email'], null, array('account' => $account));
+
+    return true;
+}
+
+function _splogin_new_setemail($contact, $email) {
+
+    // Contact heeft nog geen emailadres -> vragen en toevoegen aan CiviCRM
+    return civicrm_api3('Contact', 'update', array(
+        'contact_id'        => $contact['contact_id'],
+        'api.email.replace' => array(
+            'values' => array(array(
+                'email'            => $email,
+                'location_type_id' => 1,
+                'is_primary'       => 1,
+            )),
+        ),
+    ));
+}
