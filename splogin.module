@@ -33,7 +33,7 @@ function splogin_deliver_html_page($page_callback_result) {
 // Redirect naar voorpagina ipv /user na login
 
 function splogin_user_login(&$edit, $account) {
-    if(!isset($_POST['form_id']) || $_POST['form_id'] != 'user_pass_reset') {
+    if(!array_key_exists('destination', $_GET)) {
         $_GET['destination'] = '';
     }
 }
