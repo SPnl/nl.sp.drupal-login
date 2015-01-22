@@ -33,7 +33,8 @@ function splogin_deliver_html_page($page_callback_result) {
 // Redirect naar voorpagina ipv /user na login
 
 function splogin_user_login(&$edit, $account) {
-    if(!array_key_exists('destination', $_GET)) {
+    if(!array_key_exists('destination', $_GET) &&
+	    (!array_key_exists('form_id', $_REQUEST) || $_REQUEST['form_id'] != 'user_pass_reset')) {
         $_GET['destination'] = '';
     }
 }
@@ -268,14 +269,14 @@ function _splogin_new_checkuser($fields) {
     ));
 
     if(!$contact || $contact['count'] == 0) {
-        return array(false, 'Geen relatie met deze gegevens gevonden.<br />Lukt het niet om een account aan te maken, bel dan met 088-243 55 40.');
+        return array(false, 'Geen relatie met deze gegevens gevonden.<br />Lukt het niet om een account aan te maken, stuur dan een e-mail naar <a href="mailto:administratie@sp.nl">administratie@sp.nl</a>.');
     }
 
     // drupal_set_message(print_r($contact, true));
 
     $contact = array_shift($contact['values']);
     if($contact['postal_code'] != $fields['postcode'] || ($contact['birth_date'] != null && strtotime($contact['birth_date']) != $fields['birthdate'])) {
-        return array(false, 'Geen relatie met deze gegevens gevonden<br />Lukt het niet om een account aan te maken, bel dan met 088-243 55 40.');
+        return array(false, 'Geen relatie met deze gegevens gevonden<br />Lukt het niet om een account aan te maken, stuur dan een e-mail naar <a href="mailto:administratie@sp.nl">administratie@sp.nl</a>.');
     }
 
     return array($contact, true);
@@ -283,38 +284,38 @@ function _splogin_new_checkuser($fields) {
 
 function _splogin_new_createaccount($contact, $fields) {
 
+    // Hiermee schakelen we de automatische UFMatch uit! (geleerd van civicrm_entity)
+    if(!civicrm_initialize(true))
+        return false;
+    $config = CRM_Core_Config::singleton();
+    $config->inCiviCRM = true;
+
     // Voeg Drupal-account toe
+    $password = base_convert(uniqid('pass', true), 10, 36);
+
     $account = user_save('', array(
         'name'   => $contact['contact_id'],
         'mail'   => $contact['email'],
-        'pass'   => $fields['password'],
+        'pass'   => $password,
         'status' => 1,
         'init'   => 'email address',
         'roles'  => array(
             DRUPAL_AUTHENTICATED_RID => 'authenticated user',
         ),
     ));
-    $account->password = $fields['password'];
+    $account->password = $password;
+    $config->inCiviCRM = false;
 
-    // CiviCRM gaat nu automatisch een UFMatch-record toevoegen obv email. Maar wij zitten vaak met dubbele mailadressen. Die hook kan niet echt uit lijkt het, dus indien nodig vervangen we hem zelf door een correcte. (Volgens mij gaat dit nu goed en lost dit ism de sharedemail-module de problemen rond dit punt op.)
+    if(!$account) {
+        drupal_set_message('Er kon geen gebruikersaccount voor u aangemaakt worden. Neem contact op met administratie@sp.nl.', 'error');
+        return false;
+    }
+
+    // Handmatig UFMatch toevoegen
     $ufmatch = civicrm_api3('UFMatch', 'get', array(
         'contact_id' => $contact['contact_id'],
     ));
-    if($ufmatch['count'] > 0) {
-        $ufmrecord = array_shift($ufmatch['values']);
-        if($ufmrecord && $ufmrecord['uf_id'] != $account->uid) {
-
-            $res = civicrm_api3('UFMatch', 'delete', array(
-                'id' => $ufmrecord['id'],
-            ));
-            $res = civicrm_api3('UFMatch', 'create', array(
-                'uf_id'      => $account->uid,
-                'uf_name'    => $contact['contact_id'],
-                'contact_id' => $contact['contact_id'],
-            ));
-        }
-    } else {
-
+    if($ufmatch['count'] == 0) {
         $res = civicrm_api3('UFMatch', 'create', array(
             'uf_id'      => $account->uid,
             'uf_name'    => $contact['contact_id'],

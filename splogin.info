@@ -1,6 +1,6 @@
 name = SP Drupal-Login
 description = Aanpassingen in de loginprocedure voor SPnet
-version = 1.0
+version = 1.1
 core = 7.x
 package = sprbs
 dependencies[] = civicrm
