@@ -335,33 +335,39 @@ function _splogin_update_profile(&$account) {
 
     // Check op contact-record voor deze Drupal-user
 
-    $match = civicrm_api3('UFMatch', 'getsingle', array(
-        'uf_id' => $account->uid,
-    ));
-
-    if(!$match || !array_key_exists('contact_id', $match))
-        return false;
+    try {
+        $match = civicrm_api3('UFMatch', 'getsingle', array(
+            'uf_id' => $account->uid,
+        ));
+    } catch(CiviCRM_API3_Exception $e) {
+        return false; // No match
+    }
 
     // Haal contact op
 
     $custom_field_afdeling = variable_get('splogin_id_custom_afdeling');
     $custom_field_voorletters = variable_get('splogin_id_custom_voorletters');
 
-    $contact = civicrm_api3('Contact', 'getsingle', array(
-        'id'         => $match['contact_id'],
-        'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
-    ));
-
-    if(!$contact)
-        return false;
+    try {
+        $contact = civicrm_api3('Contact', 'getsingle', array(
+            'id'     => $match['contact_id'],
+            'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
+        ));
+    } catch(CiviCRM_API3_Exception $e) {
+        return false; // No match
+    }
 
     // Zoek afdeling op indien bekend
     $afdeling = '';
     if(array_key_exists($custom_field_afdeling, $contact)) {
-        $afdeling = civicrm_api3('Contact', 'getsingle', array(
-            'id' => $contact[$custom_field_afdeling],
-            'return' => 'display_name',
+        try {
+            $afdeling = civicrm_api3('Contact', 'getsingle', array(
+                'id'     => $contact[ $custom_field_afdeling ],
+                'return' => 'display_name',
             ))['display_name'];
+        } catch(CiviCRM_API3_Exception $e) {
+            $afdeling = '';
+        }
     }
 
     // Update de gegevens
