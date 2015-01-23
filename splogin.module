@@ -339,7 +339,7 @@ function _splogin_update_profile(&$account) {
         'uf_id' => $account->uid,
     ));
 
-    if(!$match)
+    if(!$match || !array_key_exists('contact_id', $match))
         return false;
 
     // Haal contact op
