@@ -1,19 +1,23 @@
 <?php
 /*  --------------------------------------------------------------------------
  * Aanpassingen aan de Drupal-loginprocedure voor SPnet
- * - Redirect automatisch naar login-pagina / homepage
- * - Geeft mogelijkheid account aan te maken door koppeling met CiviCRM
- * kevin@levity.nl, 2014
+ * kevin@levity.nl, 2014-2015
  * -------------------------------------------------------------------------- */
 
-// Redirect naar login bij access denied
-
+/**
+ * Implements hook_page_delivery_callback_alter.
+ * Redirect naar /user als gebruiker niet ingelogd is en op een afgeschermde pagina komt.
+ */
 function splogin_page_delivery_callback_alter(&$callback, $set = false) {
     if($callback == 'drupal_deliver_html_page') {
         $callback = 'splogin_deliver_html_page';
     }
 }
 
+/**
+ * Hierboven aangeroepen:
+ * Redirect naar /user als gebruiker niet ingelogd is en op een afgeschermde pagina komt.
+ */
 function splogin_deliver_html_page($page_callback_result) {
 
     if(is_int($page_callback_result)) {
@@ -30,17 +34,29 @@ function splogin_deliver_html_page($page_callback_result) {
     return drupal_deliver_html_page($page_callback_result);
 }
 
-// Redirect naar voorpagina ipv /user na login
-
+/**
+ * Implements hook_user_login.
+ * - Synchroniseer met Profile2-velden (vereist feature profile2_spnet)
+ * - Redirect naar voorpagina ipv /user na login
+ * @param $edit
+ * @param $account
+ */
 function splogin_user_login(&$edit, $account) {
+
+    _splogin_update_profile($account);
+
     if(!array_key_exists('destination', $_GET) &&
 	    (!array_key_exists('form_id', $_REQUEST) || $_REQUEST['form_id'] != 'user_pass_reset')) {
         $_GET['destination'] = '';
     }
 }
 
-// Custom-pagina /user/new
-
+/**
+ * Implements hook_menu.
+ * - Custom-pagina /user/new waar gebruikers account kunnen maken
+ * - Configuratiepagina om id's in te stellen voor integratie met Profile2
+ * @return array Pages
+ */
 function splogin_menu() {
     return array(
         'user/new' => array(
@@ -48,9 +64,23 @@ function splogin_menu() {
             'page callback'   => 'splogin_new',
             'access callback' => true,
         ),
+        'admin/config/sp/login' => array(
+            'title'            => 'Loginmodule',
+            'description'      => 'Instellingen voor de loginmodule',
+            'type'             => MENU_NORMAL_ITEM,
+            'page callback'    => 'drupal_get_form',
+            'page arguments'   => array('splogin_admin_form'),
+            'access callback'  => 'user_access',
+            'access arguments' => array('access administration pages'),
+            'weight'           => 21,
+        ),
     );
 }
 
+/**
+ * Als gebruiker niet ingelogd is, formulier tonen om nieuwe gebruker aan te maken
+ * @return mixed Result
+ */
 function splogin_new() {
     if(user_is_logged_in())
         return drupal_goto('user');
@@ -58,8 +88,12 @@ function splogin_new() {
         return drupal_get_form('splogin_new_form');
 }
 
-// Formulierfuncties
-
+/**
+ * Formulier om nieuwe gebruikers aan te maken
+ * @param mixed $form Form
+ * @param mixed $form_state Form state
+ * @return mixed Form
+ */
 function splogin_new_form($form, &$form_state) {
 
     if(!isset($form_state['stage']))
@@ -125,9 +159,12 @@ function splogin_new_form($form, &$form_state) {
     return $form;
 }
 
+/**
+ * Velden ophalen en parsen vanuit het formulier (aangeroepen in _validate en _submit)
+ * @param mixed $form_state Form state
+ * @return mixed Veldwaarden
+ */
 function splogin_new_get_fields(&$form_state) {
-
-    // Velden ophalen en parsen vanuit het formulier
 
     if(isset($form_state['values']['civicrm_id']))
         $form_state['multistep_values']['civicrm_id'] = $form_state['values']['civicrm_id'];
@@ -151,9 +188,10 @@ function splogin_new_get_fields(&$form_state) {
     return $form_state['multistep_values'];
 }
 
+/**
+ * Validatie voor nieuwe registratie
+ */
 function splogin_new_form_validate($form, &$form_state) {
-
-    // Validatie voor nieuwe registratie
 
     $fields = splogin_new_get_fields($form_state);
 
@@ -182,9 +220,10 @@ function splogin_new_form_validate($form, &$form_state) {
     }
 }
 
+/**
+ * Formulier nieuwe registratie verzenden
+ */
 function splogin_new_form_submit($form, &$form_state) {
-
-    // Formulier verzenden
 
     $fields = splogin_new_get_fields($form_state);
     list($contact, $status) = _splogin_new_checkuser($fields);
@@ -245,13 +284,15 @@ function splogin_new_form_submit($form, &$form_state) {
     }
 }
 
-// Koppeling met CiviCRM
-
+/**
+ * Koppeling met CiviCRM: checken of er al een gebruiker bestaat
+ * @param array $fields Field values
+ * @return array Status en contact
+ */
 function _splogin_new_checkuser($fields) {
 
-    // Controleer of gebruiker al bestaat
-
-    civicrm_initialize();
+    if(!civicrm_initialize())
+        return array(false, 'Kon niet verbinden met CiviCRM.');
 
     $user_check = civicrm_api3('UFMatch', 'Get', array(
         'contact_id' => $fields['civicrm_id'],
@@ -282,6 +323,71 @@ function _splogin_new_checkuser($fields) {
     return array($contact, true);
 }
 
+/**
+ * Update Drupal Profile2 met CiviCRM contactinfo
+ * @param object $account Drupal user account
+ * @return bool Success
+ */
+function _splogin_update_profile(&$account) {
+
+    if(!civicrm_initialize())
+        return false;
+
+    // Check op contact-record voor deze Drupal-user
+
+    $match = civicrm_api3('UFMatch', 'getsingle', array(
+        'uf_id' => $account->uid,
+    ));
+
+    if(!$match)
+        return false;
+
+    // Haal contact op
+
+    $custom_field_afdeling = 'custom_' . (int)variable_get('splogin_id_custom_afdeling');
+    $custom_field_voorletters = 'custom_' . (int)variable_get('splogin_id_custom_voorletters');
+
+    $contact = civicrm_api3('Contact', 'getsingle', array(
+        'id'         => $match['contact_id'],
+        'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
+    ));
+
+    if(!$contact)
+        return false;
+
+    // Zoek afdeling op indien bekend
+    $afdeling = '';
+    if($contact[$custom_field_afdeling]) {
+        $afdeling = civicrm_api3('Contact', 'getsingle', array(
+            'id' => $contact[$custom_field_afdeling],
+            'return' => 'display_name',
+            ))['display_name'];
+    }
+
+    // Update de gegevens
+
+    $profile = profile2_load_by_user($account, 'main');
+    if(!$profile)
+        $profile = entity_create('profile2', array('type' => 'main', 'uid' => $account->uid));
+
+    $profile->field_contact_id[LANGUAGE_NONE][0]['value'] = $contact['id'];
+    $profile->field_first_name[LANGUAGE_NONE][0]['value'] = $contact['first_name'];
+    $profile->field_middle_name[LANGUAGE_NONE][0]['value'] = $contact['middle_name'];
+    $profile->field_last_name[LANGUAGE_NONE][0]['value'] = $contact['last_name'];
+    $profile->field_phone_primary[LANGUAGE_NONE][0]['value'] = $contact['phone'];
+    $profile->field_email_primary[LANGUAGE_NONE][0]['value'] = $contact['email'];
+    $profile->field_afdeling[LANGUAGE_NONE][0]['value'] = $afdeling;
+
+    profile2_save($profile);
+    return true;
+}
+
+/**
+ * Maak Drupal-account aan voor CiviCRM-contact
+ * @param mixed $contact CiviCRM Contact
+ * @param array $fields Veldwaarden
+ * @return bool Success
+ */
 function _splogin_new_createaccount($contact, $fields) {
 
     // Hiermee schakelen we de automatische UFMatch uit! (geleerd van civicrm_entity)
@@ -329,6 +435,12 @@ function _splogin_new_createaccount($contact, $fields) {
     return true;
 }
 
+/**
+ * Contact heeft nog geen emailadres -> vragen en toevoegen aan CiviCRM
+ * @param mixed $contact CiviCRM contact
+ * @param string $email Email address
+ * @return array API call result
+ */
 function _splogin_new_setemail($contact, $email) {
 
     // Contact heeft nog geen emailadres -> vragen en toevoegen aan CiviCRM
@@ -342,4 +454,29 @@ function _splogin_new_setemail($contact, $email) {
             )),
         ),
     ));
+}
+
+/**
+ * Settings form voor loginmodule -> id's voor custom velden voor Profile2
+ * @return mixed Form
+ */
+function splogin_admin_form() {
+
+    $form = array();
+
+    $form['splogin_id_custom_afdeling'] = array(
+        '#type'          => 'textfield',
+        '#title'         => 'Veldnaam afdelings-ID',
+        '#default_value' => variable_get('splogin_id_custom_afdeling', 'custom_23'),
+        '#required'      => true,
+    );
+
+    $form['splogin_id_custom_voorletters'] = array(
+        '#type'          => 'textfield',
+        '#title'         => 'Veldnaam voorletters',
+        '#default_value' => variable_get('splogin_id_custom_voorletters', 'custom_111'),
+        '#required'      => true,
+    );
+
+    return system_settings_form($form);
 }
