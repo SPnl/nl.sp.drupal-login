@@ -78,7 +78,48 @@ function splogin_menu() {
 }
 
 /**
- * Als gebruiker niet ingelogd is, formulier tonen om nieuwe gebruker aan te maken
+ * Implements hook_enable.
+ * Maakt indien nodig velden aan op het gebruikersprofiel die we vullen vanuit CiviCRM.
+ */
+function splogin_enable() {
+
+    _splogin_create_field('field_contact_id', 'Registratienummer', 'number_integer');
+    _splogin_create_field('field_first_name', 'Voornaam');
+    _splogin_create_field('field_middle_name', 'Tussenvoegsel');
+    _splogin_create_field('field_last_name', 'Achternaam');
+    _splogin_create_field('field_initials', 'Voorletters');
+    _splogin_create_field('field_phone_primary', 'Telefoon');
+    _splogin_create_field('field_email_primary', 'E-mailadres');
+    _splogin_create_field('field_afdeling', 'Afdeling');
+}
+
+/**
+ * Maakt een veld aan indien het nog niet bestaat
+ * @param string $name Naam
+ * @param string $label Label
+ */
+function _splogin_create_field($name, $label, $type = 'text') {
+
+    if(!field_info_field($name)) {
+        field_create_field(array(
+            'field_name' => $name,
+            'type' => $type,
+        ));
+
+        field_create_instance(array(
+           'field_name' => $name,
+            'entity_type' => 'user',
+            'label' => $label,
+            'bundle' => 'user',
+            'settings' => array(
+                'user_register_form' => false,
+            ),
+        ));
+    }
+}
+
+/**
+ * Als gebruiker niet ingelogd is, formulier tonen om nieuwe gebruiker aan te maken
  * @return mixed Result
  */
 function splogin_new() {
@@ -324,9 +365,9 @@ function _splogin_new_checkuser($fields) {
 }
 
 /**
- * Update Drupal Profile2 met CiviCRM contactinfo
+ * Update Drupal-uservelden met CiviCRM contactinfo
  * @param object $account Drupal user account
- * @return bool Success
+ * @return object Drupal user account
  */
 function _splogin_update_profile(&$account) {
 
@@ -370,23 +411,26 @@ function _splogin_update_profile(&$account) {
         }
     }
 
+    $voorletters = '';
+    if(array_key_exists($custom_field_voorletters, $contact))
+        $voorletters = $contact[$custom_field_voorletters];
+
     // Update de gegevens
 
-    $profile = profile2_load_by_user($account, 'main');
-    if(!$profile)
-        $profile = entity_create('profile2', array('type' => 'main', 'uid' => $account->uid));
+    $wrapped = entity_metadata_wrapper('user', $account); // Ah, is dat nodig?
+    $wrapped->mail = $contact['email'];
 
-    $profile->field_contact_id[LANGUAGE_NONE][0]['value'] = $contact['id'];
-    $profile->field_initials[LANGUAGE_NONE][0]['value'] = $contact[$custom_field_voorletters];
-    $profile->field_first_name[LANGUAGE_NONE][0]['value'] = $contact['first_name'];
-    $profile->field_middle_name[LANGUAGE_NONE][0]['value'] = $contact['middle_name'];
-    $profile->field_last_name[LANGUAGE_NONE][0]['value'] = $contact['last_name'];
-    $profile->field_phone_primary[LANGUAGE_NONE][0]['value'] = $contact['phone'];
-    $profile->field_email_primary[LANGUAGE_NONE][0]['value'] = $contact['email'];
-    $profile->field_afdeling[LANGUAGE_NONE][0]['value'] = $afdeling;
+    $wrapped->field_contact_id = $contact['id'];
+    $wrapped->field_initials = $voorletters;
+    $wrapped->field_first_name = $contact['first_name'];
+    $wrapped->field_middle_name = $contact['middle_name'];
+    $wrapped->field_last_name = $contact['last_name'];
+    $wrapped->field_phone_primary = $contact['phone'];
+    $wrapped->field_email_primary = $contact['email'];
+    $wrapped->field_afdeling = $afdeling;
 
-    profile2_save($profile);
-    return true;
+    user_save($account);
+    return $account;
 }
 
 /**
@@ -450,7 +494,6 @@ function _splogin_new_createaccount($contact, $fields) {
  */
 function _splogin_new_setemail($contact, $email) {
 
-    // Contact heeft nog geen emailadres -> vragen en toevoegen aan CiviCRM
     return civicrm_api3('Contact', 'update', array(
         'contact_id'        => $contact['contact_id'],
         'api.email.replace' => array(
