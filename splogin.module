@@ -145,7 +145,7 @@ function splogin_new_form($form, &$form_state) {
         case 'start':
 
             $form['descr'] = array(
-                '#markup' => t('<h3>Nieuw account</h3><p>Voer uw lidnummer of relatienummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>'),
+                '#markup' => '<h3>Nieuw account</h3><p>Voer uw lidnummer of relatienummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>',
             );
             $form['civicrm_id'] = array(
                 '#type'  => 'textfield',
@@ -173,12 +173,19 @@ function splogin_new_form($form, &$form_state) {
 
         case 'email':
 
+	    if($form_state['values']['email'] != '') {
+		$msg = 'Hieronder vindt u uw e-mailadres zoals dit in ons systeem bekend is. Controleer alstublieft of dit klopt en pas het adres indien nodig aan.';
+	    } else {
+		$msg = 'U bent bekend in ons systeem, maar we hebben nog geen e-mailadres van u opgeslagen. Vul hieronder uw e-mailadres in.';
+	    }
+
             $form['descr'] = array(
-                '#markup' => t('<h3>Nieuw account</h3><p>U bent bekend in ons systeem, maar we hebben nog geen e-mailadres van u opgeslagen. Vul hieronder uw e-mailadres in.</p>'),
+                '#markup' => '<h3>Nieuw account</h3><p>' . $msg . '</p>',
             );
             $form['email'] = array(
                 '#type'  => 'textfield',
                 '#title' => t('E-mail'),
+		'#default_value' => $form_state['values']['email'],
             );
             $form['submit'] = array(
                 '#type'  => 'submit',
@@ -253,7 +260,7 @@ function splogin_new_form_validate($form, &$form_state) {
 
         case 'email':
 
-            // Controleer wachtwoord-invoer
+            // Controleer email-invoer
 
             if(!$fields['email'])
                 form_set_error('email', 'Vul een geldig e-mailadres in.');
@@ -275,18 +282,18 @@ function splogin_new_form_submit($form, &$form_state) {
         case 'start':
 
             // Controleer of gebruiker al bestaat
-            // Zo ja -> account aanmaken (maar eventueel eerst om e-mailadres vragen)
+            // Zo ja -> om emailadres vragen, daarna account aanmaken
 
             if(!$contact) {
                 form_set_error('civicrm_id', $status);
             } else {
 
-                if(!$contact['email']) {
-                    $form_state['stage'] = 'email';
-                    $form_state['rebuild'] = true;
-                } else {
-                    $addAccount = true;
-                }
+                $form_state['stage'] = 'email';
+                
+		if($contact['email'] != '')
+			$form_state['values']['email'] = $contact['email'];
+                
+		$form_state['rebuild'] = true;
             }
 
             break;
