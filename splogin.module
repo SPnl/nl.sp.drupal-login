@@ -91,6 +91,7 @@ function splogin_enable() {
     _splogin_create_field('field_phone_primary', 'Telefoon');
     _splogin_create_field('field_email_primary', 'E-mailadres');
     _splogin_create_field('field_afdeling', 'Afdeling');
+    _splogin_create_field('field_afdeling_id', 'Afdeling-ID');
 }
 
 /**
@@ -407,7 +408,9 @@ function _splogin_update_profile(&$account) {
 
     // Zoek afdeling op indien bekend
     $afdeling = '';
+    $afdeling_id = '';
     if(array_key_exists($custom_field_afdeling, $contact)) {
+	$afdeling_id = $contact[ $custom_field_afdeling ];
         try {
             $afdeling = civicrm_api3('Contact', 'getsingle', array(
                 'id'     => $contact[ $custom_field_afdeling ],
@@ -434,6 +437,7 @@ function _splogin_update_profile(&$account) {
     $wrapped->field_last_name = $contact['last_name'];
     $wrapped->field_phone_primary = $contact['phone'];
     $wrapped->field_email_primary = $contact['email'];
+    $wrapped->field_afdeling_id = $afdeling_id;
     $wrapped->field_afdeling = $afdeling;
 
     user_save($account);
