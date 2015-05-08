@@ -24,11 +24,11 @@ function splogin_deliver_html_page($page_callback_result) {
 		switch($page_callback_result) {
 
 			case MENU_ACCESS_DENIED:
-				if(!user_is_logged_in())
+				if (!user_is_logged_in()) {
 					$options = array('query' => drupal_get_destination());
 					drupal_goto('user', $options);
+				}
 				break;
-
 		}
 	}
 
