@@ -451,7 +451,7 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_afdeling = $afdeling;
 	$wrapped->save();
 	$account = $wrapped->raw();
-	watchdog('splogin', WATCHDOG_DEBUG, 'Login with afdeling user '.$contact['id'].' with afdeling '.$wrapped->field_afdeling);
+	watchdog('splogin', 'Login with contact id: '.$contact['id'].' with afdeling '.$afdeling, array(), WATCHDOG_INFO);
 	return $account;
 }
 
