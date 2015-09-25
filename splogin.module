@@ -446,6 +446,7 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_afdeling = $afdeling;
 	$wrapped->save();
 	$account = $wrapped->raw();
+	watchdog('splogin', WATCHDOG_DEBUG, print_r($account, true));
 	return $account;
 }
 
