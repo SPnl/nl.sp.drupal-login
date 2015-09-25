@@ -43,8 +43,13 @@ function splogin_deliver_html_page($page_callback_result) {
  * @param $account
  */
 function splogin_user_login(&$edit, $account) {
+	global $user; //this is the smae as $account
 
-	_splogin_update_profile($account);
+	$updatedUser = _splogin_update_profile($account);
+	if ($updatedUser) {
+		$account = $updatedUser;
+		$user = $updatedUser; //reset the global user object
+	}
 
 	if(!array_key_exists('destination', $_GET) &&
 		(!array_key_exists('form_id', $_REQUEST) || $_REQUEST['form_id'] != 'user_pass_reset')
