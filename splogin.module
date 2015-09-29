@@ -43,7 +43,7 @@ function splogin_deliver_html_page($page_callback_result) {
  * @param $account
  */
 function splogin_user_login(&$edit, $account) {
-	global $user; //this is the smae as $account
+	global $user; //this is the same as $account
 
 	$updatedUser = _splogin_update_profile($account);
 	if ($updatedUser) {
@@ -315,7 +315,7 @@ function splogin_new_form_submit($form, &$form_state) {
 				form_set_error('civicrm_id', 'Er is een fout opgetreden: relatie niet gevonden.');
 			} else {
 
-				watchdog('splogin', WATCHDOG_INFO, 'Updating email address for contact ' . $contact['contact_id'] . ', new email ' . $fields['email'] . '.');
+				watchdog('splogin', 'Updating email address for contact ' . $contact['contact_id'] . ', new email ' . $fields['email'] . '.', array(), WATCHDOG_INFO);
 				_splogin_new_setemail($contact, $fields['email']);
 				$contact['email'] = $fields['email'];
 				$addAccount = true;
@@ -356,7 +356,7 @@ function _splogin_new_checkuser($fields) {
 	));
 
 	if($user_check && $user_check['count'] > 0) {
-		watchdog('splogin', WATCHDOG_INFO, 'Won\'t create user for contact ' . $fields['civicrm_id'] . ' - already exists.');
+		watchdog('splogin', 'Won\'t create user for contact ' . $fields['civicrm_id'] . ' - already exists.', array(), WATCHDOG_INFO);
 		return array(false, 'Er bestaat al een gebruiker voor deze relatie.<br /><a href="' . url('user') . '">Log hier in.</a>');
 	}
 
@@ -368,7 +368,7 @@ function _splogin_new_checkuser($fields) {
 	));
 
 	if(!$contact || $contact['count'] == 0) {
-		watchdog('splogin', WATCHDOG_INFO, 'Contact check: no contact with this ID (' . $fields['civicrm_id'] . ').');
+		watchdog('splogin', 'Contact check: no contact with this ID (' . $fields['civicrm_id'] . ').', array(), WATCHDOG_INFO);
 		return array(false, 'Geen relatie met deze gegevens gevonden.<br />Lukt het niet om een account aan te maken, stuur dan een e-mail naar <a href="mailto:administratie@sp.nl">administratie@sp.nl</a>.');
 	}
 
@@ -376,7 +376,7 @@ function _splogin_new_checkuser($fields) {
 
 	$contact = array_shift($contact['values']);
 	if($contact['postal_code'] != $fields['postcode'] || ($contact['birth_date'] != null && strtotime($contact['birth_date']) != $fields['birthdate'])) {
-		watchdog('splogin', WATCHDOG_INFO, 'Contact check: invalid postal code or birth date for contact ' . $fields['civicrm_id'] . '.');
+		watchdog('splogin', 'Contact check: invalid postal code or birth date for contact ' . $fields['civicrm_id'] . '.', array(), WATCHDOG_INFO);
 		return array(false, 'Geen relatie met deze gegevens gevonden<br />Lukt het niet om een account aan te maken, stuur dan een e-mail naar <a href="mailto:administratie@sp.nl">administratie@sp.nl</a>.');
 	}
 
@@ -451,7 +451,18 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_afdeling = $afdeling;
 	$wrapped->save();
 	$account = $wrapped->raw();
-	watchdog('splogin', 'Login with contact id: '.$contact['id'].' with afdeling '.$afdeling, array(), WATCHDOG_INFO);
+	if (empty($afdeling_id)) {
+		watchdog(
+			'splogin',
+			'Empty afdelings data after login. Account object: %account. Contact object: %contact.',
+			array(
+				'%account' => print_r($account, true),
+				'%contact' => print_r($contact, true),
+			),
+			WATCHDOG_ERROR
+		);
+	}
+
 	return $account;
 }
 
@@ -469,7 +480,7 @@ function _splogin_new_createaccount($contact, $fields) {
 	$config = CRM_Core_Config::singleton();
 	$config->inCiviCRM = true;
 
-	watchdog('splogin', WATCHDOG_INFO, 'Creating account for contact ' . $contact['contact_id'] . ' with email ' . $contact['email'] . '.');
+	watchdog('splogin', 'Creating account for contact ' . $contact['contact_id'] . ' with email ' . $contact['email'] . '.', array(), WATCHDOG_INFO);
 
 	// Voeg Drupal-account toe
 	$password = base_convert(uniqid('pass', true), 10, 36);
@@ -488,7 +499,7 @@ function _splogin_new_createaccount($contact, $fields) {
 	$config->inCiviCRM = false;
 
 	if(!$account) {
-		watchdog('splogin', WATCHDOG_WARNING, 'Could not create Drupal user account for contact ' . $contact['contact_id'] . ' with email ' . $contact['email'] . '.');
+		watchdog('splogin', 'Could not create Drupal user account for contact ' . $contact['contact_id'] . ' with email ' . $contact['email'] . '.', array(), WATCHDOG_WARNING);
 		drupal_set_message('Er kon geen gebruikersaccount voor u aangemaakt worden. Neem contact op met administratie@sp.nl.', 'error');
 		return false;
 	}
@@ -504,7 +515,7 @@ function _splogin_new_createaccount($contact, $fields) {
 			'contact_id' => $contact['contact_id'],
 		));
 		if(!$res) {
-			watchdog('splogin', WATCHDOG_WARNING, 'Could not create UFMatch record for contact ' . $contact['contact_id'] . '.');
+			watchdog('splogin', 'Could not create UFMatch record for contact ' . $contact['contact_id'] . '.', array(), WATCHDOG_WARNING);
 		}
 	}
 
