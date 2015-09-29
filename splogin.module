@@ -383,6 +383,12 @@ function _splogin_new_checkuser($fields) {
 	return array($contact, true);
 }
 
+function splogin_user_load(&$users) {
+	foreach($users as $uid => $user) {
+		$users[$uid] = _splogin_update_profile($user);
+	}
+}
+
 /**
  * Update Drupal-uservelden met CiviCRM contactinfo
  * @param object $account Drupal user account
