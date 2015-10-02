@@ -462,7 +462,7 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_afdeling_id = $afdeling_id;
 	$wrapped->field_afdeling = $afdeling;
 	//$wrapped->save();
-	//$account = $wrapped->raw();
+	$account = $wrapped->raw();
 	user_save($account);
 
 	watchdog(
