@@ -463,14 +463,15 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_afdeling = $afdeling;
 	//$wrapped->save();
 	$account = $wrapped->raw();
-	user_save($account);
+	$updated_user = user_save($account);
 
 	watchdog(
 		'splogin',
-		'Afdelings data after login. Account object: %account. Contact object: %contact.',
+		'Afdelings data is %afdeling. after login. Account object: %account. Contact object: %contact.',
 		array(
-			'%account' => print_r($account, true),
+			'%account' => print_r($updated_user, true),
 			'%contact' => print_r($contact, true),
+			'%afdeling' => $afdeling,
 		),
 		WATCHDOG_ERROR
 	);
