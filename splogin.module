@@ -461,19 +461,19 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_email_primary = $contact['email'];
 	$wrapped->field_afdeling_id = $afdeling_id;
 	$wrapped->field_afdeling = $afdeling;
-	$wrapped->save();
-	$account = $wrapped->raw();
-	if (empty($afdeling_id)) {
-		watchdog(
-			'splogin',
-			'Empty afdelings data after login. Account object: %account. Contact object: %contact.',
-			array(
-				'%account' => print_r($account, true),
-				'%contact' => print_r($contact, true),
-			),
-			WATCHDOG_ERROR
-		);
-	}
+	//$wrapped->save();
+	//$account = $wrapped->raw();
+	user_save($account);
+
+	watchdog(
+		'splogin',
+		'Afdelings data after login. Account object: %account. Contact object: %contact.',
+		array(
+			'%account' => print_r($account, true),
+			'%contact' => print_r($contact, true),
+		),
+		WATCHDOG_ERROR
+	);
 
 	return $account;
 }
