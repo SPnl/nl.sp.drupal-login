@@ -46,7 +46,6 @@ function splogin_user_login(&$edit, $account) {
 	global $user; //this is the same as $account
 
 	$updatedUser = _splogin_update_profile($account);
-	watchdog('splogin', 'hook user login, updated user: %account', array('%account' => print_r($updatedUser, true)), WATCHDOG_NOTICE);
 	if ($updatedUser) {
 		$account = $updatedUser;
 		$user = $updatedUser; //reset the global user object
@@ -384,15 +383,6 @@ function _splogin_new_checkuser($fields) {
 	return array($contact, true);
 }
 
-/*function splogin_user_load(&$users) {
-	watchdog('splogin', 'hook_user_load called');
-	foreach($users as $uid => $user) {
-		watchdog('splogin', 'hook user load with UID: %uid', array('%uid' => $uid), WATCHDOG_NOTICE);
-		$users[$uid] = _splogin_update_profile($user);
-		watchdog('splogin', 'hook user load user: %user', array('%user' => print_r($users[$uid], TRUE)), WATCHDOG_NOTICE);
-	}
-}*/
-
 /**
  * Update Drupal-uservelden met CiviCRM contactinfo
  * @param object $account Drupal user account
@@ -400,7 +390,6 @@ function _splogin_new_checkuser($fields) {
  */
 function _splogin_update_profile(&$account) {
 
-	watchdog('splogin', 'call update profile for user with id: %uid', array('%uid' => $account->uid), WATCHDOG_NOTICE);
 	if(!civicrm_initialize())
 		return false;
 
@@ -423,7 +412,6 @@ function _splogin_update_profile(&$account) {
 			'id'     => $match['contact_id'],
 			'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
 		));
-		watchdog('splogin', 'call civicrm contact: %contact', array('%contact' => print_r($contact, true)), WATCHDOG_NOTICE);
 	} catch(CiviCRM_API3_Exception $e) {
 		return false; // No match
 	}
@@ -464,17 +452,6 @@ function _splogin_update_profile(&$account) {
 	//$wrapped->save();
 	$account = $wrapped->raw();
 	$updated_user = user_save($account);
-
-	watchdog(
-		'splogin',
-		'Afdelings data is %afdeling. after login. Account object: %account. Contact object: %contact.',
-		array(
-			'%account' => print_r($updated_user, true),
-			'%contact' => print_r($contact, true),
-			'%afdeling' => $afdeling,
-		),
-		WATCHDOG_ERROR
-	);
 
 	return $account;
 }
