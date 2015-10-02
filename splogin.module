@@ -46,7 +46,7 @@ function splogin_user_login(&$edit, $account) {
 	global $user; //this is the same as $account
 
 	$updatedUser = _splogin_update_profile($account);
-	watchdog('splogin', 'hook user login, updated user: %account', array('%account' => print_r($updatedUser)), WATCHDOG_NOTICE);
+	watchdog('splogin', 'hook user login, updated user: %account', array('%account' => print_r($updatedUser, true)), WATCHDOG_NOTICE);
 	if ($updatedUser) {
 		$account = $updatedUser;
 		$user = $updatedUser; //reset the global user object
