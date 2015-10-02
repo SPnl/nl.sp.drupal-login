@@ -384,14 +384,14 @@ function _splogin_new_checkuser($fields) {
 	return array($contact, true);
 }
 
-function splogin_user_load(&$users) {
+/*function splogin_user_load(&$users) {
 	watchdog('splogin', 'hook_user_load called');
 	foreach($users as $uid => $user) {
 		watchdog('splogin', 'hook user load with UID: %uid', array('%uid' => $uid), WATCHDOG_NOTICE);
 		$users[$uid] = _splogin_update_profile($user);
 		watchdog('splogin', 'hook user load user: %user', array('%user' => print_r($users[$uid], TRUE)), WATCHDOG_NOTICE);
 	}
-}
+}*/
 
 /**
  * Update Drupal-uservelden met CiviCRM contactinfo
