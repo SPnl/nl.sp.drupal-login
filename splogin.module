@@ -452,15 +452,15 @@ function _splogin_update_profile(&$account) {
 	$wrapped = entity_metadata_wrapper('user', $account); // Ah, is dat nodig?
 	$wrapped->mail = $contact['email'];
 
-	$wrapped->field_contact_id = $contact['id'];
-	$wrapped->field_initials = $voorletters;
-	$wrapped->field_first_name = $contact['first_name'];
-	$wrapped->field_middle_name = $contact['middle_name'];
-	$wrapped->field_last_name = $contact['last_name'];
-	$wrapped->field_phone_primary = $contact['phone'];
-	$wrapped->field_email_primary = $contact['email'];
-	$wrapped->field_afdeling_id = $afdeling_id;
-	$wrapped->field_afdeling = $afdeling;
+	$wrapped->field_contact_id->set($contact['id']);
+	$wrapped->field_initials->set($voorletters);
+	$wrapped->field_first_name->set($contact['first_name']);
+	$wrapped->field_middle_name->set($contact['middle_name']);
+	$wrapped->field_last_name->set($contact['last_name']);
+	$wrapped->field_phone_primary->set($contact['phone']);
+	$wrapped->field_email_primary->set($contact['email']);
+	$wrapped->field_afdeling_id->set($afdeling_id);
+	$wrapped->field_afdeling->set($afdeling);
 	//$wrapped->save();
 	$account = $wrapped->raw();
 	$updated_user = user_save($account);
