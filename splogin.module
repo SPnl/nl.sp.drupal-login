@@ -81,6 +81,15 @@ function splogin_menu() {
 			'access arguments' => array('access administration pages'),
 			'weight'           => 21,
 		),
+		'admin/config/sp/login_manual_sync' => array(
+			'title'            => t('Manually Synchronize CiviCRM Data'),
+			'description'      => 'Synchroniseer handmatig CiviCRM datat naar Drupal gebruikersprofielen. Zoals bijv. afdeling en initialen e.d.',
+			'page callback'    => 'drupal_get_form',
+			'page arguments'   => array('splogin_manual_sync'),
+			'access callback'  => 'user_access',
+			'access arguments' => array('access administration pages'),
+			'type'             => MENU_NORMAL_ITEM,
+		),
 	);
 }
 
@@ -560,4 +569,48 @@ function splogin_admin_form() {
 	);
 
 	return system_settings_form($form);
+}
+
+/**
+ * Manual sync form. Provides a sumbit button to manually sync memberships to roles.
+ *
+ * @ingroup forms
+ * @see sprelasync_manual_sync_submit()
+ */
+function splogin_manual_sync() {
+	$form = array();
+	$form['manual_sync'] = array(
+		'#type'  => 'fieldset',
+		'#title' => t('Manual Synchronization:'),
+	);
+	$form['manual_sync']['manual_sync_submit'] = array(
+		'#type'  => 'submit',
+		'#value' => t('Synchronize CiviCRM data to Drupal Profiles now'),
+	);
+
+	return $form;
+}
+
+function splogin_manual_sync_submit($form, &$form_state) {
+	$count = splogin_sync();
+	drupal_set_message(' '.$count.' gebruikersprofielen zijn bijgewerkt');
+	$form_state['redirect'] = 'admin/config';
+}
+
+function splogin_sync() {
+	if(!civicrm_initialize()) {
+		return;
+	}
+
+	$query = "SELECT DISTINCT(ur.uid) FROM {users_roles} AS ur LEFT JOIN {field_data_field_afdeling_id} AS afd ON ur.uid = afd.entity_id WHERE ur.rid IN (:rids) AND (afd.field_afdeling_id_value IS NULL or afd.field_afdeling_id_value = '')";
+	$result = db_query($query, array(':rids' => array(7,8,11,12,13))); //voorzitter, penningmeester, bestelpersoon afd,  bestelpersoon prov, bestelpersoon land
+	$uids = $result->fetchCol();
+
+	$users = user_load_multiple($uids);
+	$i = 0;
+	foreach($users as $uid => $user) {
+		_splogin_update_profile($user);
+		$i++;
+	}
+	return $i;
 }
