@@ -384,8 +384,11 @@ function _splogin_new_checkuser($fields) {
 }
 
 function splogin_user_load(&$users) {
+	watchdog('splogin', 'hook_user_load called');
 	foreach($users as $uid => $user) {
+		watchdog('splogin', 'hook user load with UID: %uid', array('%uid' => $uid), WATCHDOG_NOTICE);
 		$users[$uid] = _splogin_update_profile($user);
+		watchdog('splogin', 'hook user load user: %user', array('%user' => print_r($users[$uid], TRUE)), WATCHDOG_NOTICE);
 	}
 }
 
@@ -396,6 +399,7 @@ function splogin_user_load(&$users) {
  */
 function _splogin_update_profile(&$account) {
 
+	watchdog('splogin', 'call update profile for user with id: %uid', array('%uid' => $account->uid), WATCHDOG_NOTICE);
 	if(!civicrm_initialize())
 		return false;
 
@@ -418,6 +422,7 @@ function _splogin_update_profile(&$account) {
 			'id'     => $match['contact_id'],
 			'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
 		));
+		watchdog('splogin', 'call civicrm contact: %contact', array('%contact' => print_r($contact, true)), WATCHDOG_NOTICE);
 	} catch(CiviCRM_API3_Exception $e) {
 		return false; // No match
 	}
