@@ -460,7 +460,15 @@ function _splogin_update_profile(&$account) {
 	$wrapped->field_afdeling->set($afdeling);
 	//$wrapped->save();
 	$account = $wrapped->raw();
+
+  // CiviCoop 27/10/2016 - disable cache refresh
+  $config = CRM_Core_Config::singleton();
+  $config->doNotResetCache = 1;
+
 	$updated_user = user_save($account);
+
+  // CiviCoop 27/10/2016 - enable cache refresh again
+  $config->doNotResetCache = 0;
 
 	return $account;
 }
