@@ -266,7 +266,7 @@ function splogin_new_form_validate($form, &$form_state) {
 
     // Controleer invoer
 
-    if(!$fields['civicrm_id'] || (int)$fields['civicrm_id'] < 1 || (int)$fields['civicrm_id'] > 1000000)
+    if(!$fields['civicrm_id'] || (int)$fields['civicrm_id'] < 1 || (int)$fields['civicrm_id'] > 10000000)
       form_set_error('civicrm_id', 'Ongeldig relatienummer');
     if(!$fields['postcode'])
       form_set_error('postcode', 'Geen postcode ingevuld.');
