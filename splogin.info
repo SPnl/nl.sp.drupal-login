@@ -6,3 +6,5 @@ package = sprbs
 dependencies[] = civicrm
 dependencies[] = me
 dependencies[] = sharedemail
+dependencies[] = spcivipush
+dependencies[] = splogin

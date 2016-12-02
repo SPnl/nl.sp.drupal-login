@@ -26,7 +26,7 @@ function splogin_deliver_html_page($page_callback_result) {
     case MENU_ACCESS_DENIED:
       if (!user_is_logged_in()) {
         $options = array('query' => drupal_get_destination());
-        drupal_goto('user', $options);
+        drupal_goto('login', $options);
       }
       break;
     }
@@ -89,6 +89,13 @@ function splogin_menu() {
       'access callback'  => 'user_access',
       'access arguments' => array('access administration pages'),
       'type'             => MENU_NORMAL_ITEM,
+    ),
+    'login' => array(
+      'title' => '',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('splogin_login_form'),
+      'file' => 'splogin_login_form.inc',
+      'access callback' => TRUE,
     ),
   );
 }
@@ -622,3 +629,205 @@ function splogin_sync() {
   }
   return $i;
 }
+
+/*
+ * Sends email with id to contact if found, or sends email with given data to administration
+ * with request to send id to contact.
+ */
+function splogin_process_id_request($values) {
+  $items = spcivipush_get_data_names();
+  foreach ($items as $key => $name) {
+    if (isset($values[$key])) {
+      $data[$key] = $values[$key];
+    }
+  }
+
+  // Cleanup data.
+  $data = spcivipush_parse_data($data);
+
+  if (!empty($data)) {
+    $same_contacts = spcivipush_find_same_contacts($data, $debug_info);
+    if (!empty($same_contacts) && count($same_contacts) === 1) {
+      $data['contact_id'] = current($same_contacts);
+      drupal_set_message('<p>Uw relatie- of lidnummer is per e-mail naar u opgestuurd. Mocht u geen mail ontvangen, neem dan contact op met onze administratie: tel (+31) (0)88 243 55 40.</p>');
+
+      $civicrm_contact_data = splogin_get_civi_contact($data['contact_id']);
+      if (!empty($civicrm_contact_data['email'])) {
+        // Send email to CiviCRM contact with id.
+        drupal_mail('splogin', 'splogin_send_id_to_contact', $civicrm_contact_data['email'], language_default(), $data, 'administratie@sp.nl');
+        // Check if contact data might have changed.
+        if (
+          spcivipush_valid_email($civicrm_contact_data['email']) !== $data['email'] ||
+          $civimail !== $data['email'] ||
+          spcivipush_valid_telephone($civicrm_contact_data['phone']) !== $data['telephone'] ||
+          $civicrm_contact_data['street_address'] !== $data['street_and_number'] ||
+          spcivipush_valid_postal_code($civicrm_contact_data['postal_code']) !== $data['postal_code'] ||
+          strtolower($civicrm_contact_data['city']) !== strtolower($data['locality'])
+        ) {
+          // Send mail to administration to check contact data.
+          drupal_mail('splogin', 'splogin_send_administration_check_contact_data', 'administratie@sp.nl', language_default(), $data, 'administratie@sp.nl');
+        }
+      }
+      return;
+    }
+  }
+  drupal_set_message('Onze administratie zal contact met u opnemen om uw lidnummer door te geven.');
+  // TODO: mailversturen administratie met gegevens met verzoek lidnummer door te geven.
+  return FALSE;
+}
+
+/*
+ * Checks wether an CiviCRM contact exists for given relation number.
+ */
+function splogin_get_civi_contact($contact_id) {
+
+  if(!civicrm_initialize()) {
+    drupal_set_message('Kon niet verbinden met CiviCRM', 'error');
+    return FALSE;
+  }
+
+  // Haal contact op en controleer of de gegevens kloppen
+  $contact = civicrm_api3('Contact', 'Get', array(
+    'id'         => (int)$contact_id,
+    'sequential' => true,
+  ));
+
+  if(!empty($contact) && $contact['count'] > 0) {
+    $contact = array_shift($contact['values']);
+    return $contact;
+  }
+
+  return FALSE;
+}
+
+/*
+ * Checks wether an Drupal account exists for given relation number.
+ */
+function splogin_drupal_account_exists($contact_id) {
+  if(!civicrm_initialize()) {
+    drupal_set_message('Kon niet verbinden met CiviCRM', 'error');
+    return FALSE;
+  }
+
+  $user_check = civicrm_api3('UFMatch', 'Get', array(
+    'contact_id' => (int)$contact_id,
+  ));
+
+  if($user_check && $user_check['count'] > 0) {
+    $user_check_data = array_shift($user_check['values']);
+    $drupal_uid = $user_check_data['uf_id'];
+    if (!empty($drupal_uid)) {
+      return $drupal_uid;
+    }
+  }
+
+  return FALSE;
+}
+
+/*
+ * Verifies if user is civicrm user.
+ */
+function splogin_verify_civi_user($contact_id, $postal_code, $birth_date) {
+  $postal_code_form = spcivipush_valid_postal_code($postal_code);
+  $contact_data = splogin_get_civi_contact($contact_id);
+  if ($contact_data !== FALSE) {
+    $postal_code_civi = spcivipush_valid_postal_code($contact_data['postal_code']);
+    if (
+      $postal_code_form === $postal_code_civi &&
+      $birth_date === $contact_data['birth_date']
+    ) {
+      if (!empty($contact_data['email'])) {
+        return $contact_data['email'];
+      }
+      else {
+        return 'contact_valid_no_email';
+      }
+    }
+  }
+  return FALSE;
+}
+
+/*
+ * Sends account verification mail to administration.
+ */
+function splogin_send_account_not_verified_mail($values) {
+  drupal_mail('splogin', 'splogin_send_administration_account_not_verified', 'administratie@sp.nl', language_default(), $values, 'administratie@sp.nl');
+  drupal_set_message('Onze administratie neemt contact met u op om u toegang tot SPNET te geven');
+}
+
+/**
+ * Implements hook_date_select_process_alter
+ */
+function splogin_date_select_process_alter(&$element, &$form_state, $context) {
+  if ($context['form']['#id'] == 'splogin-login-form') {
+    if ($element['#name'] == 'birth_date') {
+      $list = &$element['year']['#options'];
+      reset($list);
+      $key = key($list);
+      unset($list[$key]);
+      $list = array_reverse($list, TRUE);
+      $list = array('') + $list;
+    }
+  }
+}
+
+function splogin_mail($key, &$message, $params) {
+  foreach ($params as $params_key => $params_value) {
+    $params[$params_key] = check_plain($params_value);
+  }
+  switch ($key) {
+  case 'splogin_send_id_to_contact':
+    $message['subject'] = 'Jouw relatie- of lidnummer voor SPNET';
+    $message['body'][] = '<p>Beste ' . $params['first_name'] . ',</p>';
+    $message['body'][] = '<p>Jouw lidnummer is ' . $params['contact_id'] . '.</p>';
+    $message['body'][] = '<p>Met vriendelijke groet,<br/>SP</p>';
+    break;
+  case 'splogin_send_administration_check_contact_data':
+    $name = $params['first_name'] . ' ' . $params['middle_name'] . ' ' . $params['last_name'];
+    $message['subject'] = 'SPNET: Relatiegegevens controleren';
+    $message['body'][] = '<p>Beste administratie,</p>';
+    $message['body'][] = '<p>' . $name . ' heeft zijn lidnummer opgevraagd om in te kunnen loggen in SPNET. Er is een e-mail met het lidnummer naar ' . $name . ' verzonden (het e-mailadres uit CiviCRM).</p><p>' . $name . ' heeft hierbij is de onderstaande informatie doorgegeven. Er is een aanwijzing dat er mogelijk gegevens in CiviCRM niet up-to-date zijn.</p>';
+    $message['body'][] = '<p>Lidnummer: ' . $params['contact_id'] . '</p>';
+    $message['body'][] = '<p>Doorgegeven informatie:<br/>';
+    $message['body'][] = 'Naam: ' . $name . '<br/>';
+    $message['body'][] = 'E-mailadres: ' . $params['email'] . '<br/>';
+    $message['body'][] = 'Telefoonnummer: ' . $params['telephone'] . '<br/>';
+    $message['body'][] = 'Adres: ' . $params['street_and_number'] . '<br/>';
+    $message['body'][] = 'Postcode: ' . $params['postal_code'] . '<br/>';
+    $message['body'][] = 'Plaats: ' . $params['locality'] . '</p>';
+    $message['body'][] = '<p>Met vriendelijke groet,<br/>SPNET</p>';
+    break;
+  case 'splogin_send_administration_account_not_verified':
+    $name = $params['first_name'] . ' ' . $params['middle_name'] . ' ' . $params['last_name'];
+    $message['subject'] = 'SPNET: Contactgegevens niet gevonden';
+    $message['body'][] = '<p>Beste administratie,</p>';
+    $message['body'][] = '<p>' . $name . ' heeft een poging gedaan om te kunnen loggen in SPNET. Het is niet gelukt om een Drupal account aan te maken omdat de controle van geboortedatum en postcode niet is gelukt. Kunnen kijken wat er misgaat met de geboortedatum, postcode controle en als e.e.a. gecontroleerd is handmatig een account aanmaken voor ' . $name . ' en de inloggegevens doorgeven?</p><p>' . $name . ' heeft hierbij is de onderstaande informatie doorgegeven:</p>';
+    $message['body'][] = '<p>Lidnummer: ' . $params['contact_id'] . '</p>';
+    $message['body'][] = '<p>Doorgegeven informatie:<br/>';
+    $message['body'][] = 'Naam: ' . $name . '<br/>';
+    $message['body'][] = 'E-mailadres: ' . $params['email'] . '<br/>';
+    $message['body'][] = 'Telefoonnummer: ' . $params['telephone'] . '<br/>';
+    $message['body'][] = 'Adres: ' . $params['street_and_number'] . '<br/>';
+    $message['body'][] = 'Postcode: ' . $params['postal_code'] . '<br/>';
+    $message['body'][] = 'Plaats: ' . $params['locality'] . '</p>';
+    $message['body'][] = '<p>Met vriendelijke groet,<br/>SPNET</p>';
+    break;
+  }
+}
+
+function splogin_new_civi_email($data) {
+  if(!civicrm_initialize()) {
+    drupal_set_message('Kon niet verbinden met CiviCRM', 'error');
+    return FALSE;
+  }
+  _splogin_new_setemail($data, $data['email']); 
+}
+
+function splogin_new_create_account($stored_data) {
+  $values['contact_id'] = $stored_data['contact_id'];
+  $result = _splogin_new_createaccount($stored_data, array());
+  if ($result !== FALSE) {
+    drupal_set_message('Er is een email naar u verzonden met verdere instructies om toegang te krijgen tot SPNET');
+  }
+}
+

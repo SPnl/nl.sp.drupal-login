@@ -1,0 +1,25 @@
+.form-item-birthdate label {
+    float: left;
+    margin: 0 1em 0 0;
+}
+
+#splogin-login-form {
+  min-height: 60vh;
+  padding: 0 1em;
+}
+
+#splogin-login-form .form-submit {
+  margin-top: 1em;
+}
+
+#edit-no-id-button,
+#edit-no-member-button {
+  background-color: #555555;
+  border-color: #555555;
+}
+
+#edit-no-id-button:hover,
+#edit-no-member-button:hover {
+  background-color: #000000;
+  border-color: #000000;
+}
