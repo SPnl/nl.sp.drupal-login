@@ -6,6 +6,16 @@
 
 function splogin_login_form($form, &$form_state) {
 
+  if (user_is_logged_in()) {
+    $site_frontpage = variable_get('site_frontpage', 'node');
+    drupal_goto($site_frontpage);
+  }
+
+  if (!isset($form_state['storage']['destination'])) {
+    $destination = drupal_get_destination();
+    $form_state['storage']['destionation'] = $destination['destination'];
+  }
+
   form_load_include($form_state, 'inc', 'content', 'includes/password');
 
   $form['#attached']['css'] = array(
@@ -22,7 +32,7 @@ function splogin_login_form($form, &$form_state) {
 
   case 'start':
 
-    $title = 'Aanmelden';
+    $title = 'Welkom';
     $default = (isset($stored_data['contact_id'])) ? $stored_data['contact_id'] : '';
 
     $form['start_intro'] = array(
@@ -580,7 +590,7 @@ function splogin_login_form_submit($form, &$form_state) {
             global $user;
             $user = user_load($drupal_account);
             user_login_finalize($user);
-            drupal_goto();
+            drupal_goto($storage['destination']);
           }
         }
         else {
