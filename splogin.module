@@ -169,11 +169,11 @@ function splogin_new_form($form, &$form_state) {
   case 'start':
 
     $form['descr'] = array(
-      '#markup' => '<h3>Nieuw account</h3><p>Voer uw lidnummer of relatienummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>',
+      '#markup' => '<h3>Nieuw account</h3><p>Voer uw lidnummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>',
     );
     $form['civicrm_id'] = array(
       '#type'  => 'textfield',
-      '#title' => t('Relatienummer'),
+      '#title' => t('Lidnummer'),
     );
     $form['postcode'] = array(
       '#type'  => 'textfield',
@@ -274,7 +274,7 @@ function splogin_new_form_validate($form, &$form_state) {
     // Controleer invoer
 
     if(!$fields['civicrm_id'] || (int)$fields['civicrm_id'] < 1 || (int)$fields['civicrm_id'] > 10000000)
-      form_set_error('civicrm_id', 'Ongeldig relatienummer');
+      form_set_error('civicrm_id', 'Ongeldig lidnummer');
     if(!$fields['postcode'])
       form_set_error('postcode', 'Geen postcode ingevuld.');
     if($fields['birthdate'] === false || $fields['birthdate'] > time() - 12 * 365 * 86400)
@@ -634,7 +634,8 @@ function splogin_sync() {
  * Sends email with id to contact if found, or sends email with given data to administration
  * with request to send id to contact.
  */
-function splogin_process_id_request($values) {
+function splogin_process_id_request(&$form_state) {
+  $values = $form_state['values'];
   $items = spcivipush_get_data_names();
   foreach ($items as $key => $name) {
     if (isset($values[$key])) {
@@ -649,7 +650,7 @@ function splogin_process_id_request($values) {
     $same_contacts = spcivipush_find_same_contacts($data, $debug_info);
     if (!empty($same_contacts) && count($same_contacts) === 1) {
       $data['contact_id'] = current($same_contacts);
-      drupal_set_message('<p>Uw relatie- of lidnummer is per e-mail naar u opgestuurd. Mocht u geen mail ontvangen, neem dan contact op met onze administratie: tel (+31) (0)88 243 55 40.</p>');
+      $form_state['finish_markup'] = '<p>Uw lidnummer is per e-mail naar u opgestuurd. Mocht u geen mail ontvangen, neem dan contact op met onze administratie: tel (+31) (0)88 243 55 40.</p>';
 
       $civicrm_contact_data = splogin_get_civi_contact($data['contact_id']);
       if (!empty($civicrm_contact_data['email'])) {
@@ -671,7 +672,7 @@ function splogin_process_id_request($values) {
       return;
     }
   }
-  drupal_set_message('Onze administratie zal contact met u opnemen om uw lidnummer door te geven.');
+  $form_state['finish_markup'] = 'Onze administratie zal contact met u opnemen om uw lidnummer door te geven.';
   // TODO: mailversturen administratie met gegevens met verzoek lidnummer door te geven.
   return FALSE;
 }
@@ -750,9 +751,10 @@ function splogin_verify_civi_user($contact_id, $postal_code, $birth_date) {
 /*
  * Sends account verification mail to administration.
  */
-function splogin_send_account_not_verified_mail($values) {
+function splogin_send_account_not_verified_mail(&$form_state) {
+  $values = $form_state['values'];
   drupal_mail('splogin', 'splogin_send_administration_account_not_verified', 'administratie@sp.nl', language_default(), $values, 'administratie@sp.nl');
-  drupal_set_message('Onze administratie neemt contact met u op om u toegang tot SPNET te geven');
+  $form_state['finish_markup'] = 'Onze administratie neemt contact met u op om u toegang tot SPNET te geven';
 }
 
 /**
@@ -777,7 +779,7 @@ function splogin_mail($key, &$message, $params) {
   }
   switch ($key) {
   case 'splogin_send_id_to_contact':
-    $message['subject'] = 'Jouw relatie- of lidnummer voor SPNET';
+    $message['subject'] = 'Jouw lidnummer voor SPNET';
     $message['body'][] = '<p>Beste ' . $params['first_name'] . ',</p>';
     $message['body'][] = '<p>Jouw lidnummer is ' . $params['contact_id'] . '.</p>';
     $message['body'][] = '<p>Met vriendelijke groet,<br/>SP</p>';

@@ -12,14 +12,16 @@
   margin-top: 1em;
 }
 
-#edit-no-id-button,
-#edit-no-member-button {
-  background-color: #555555;
+input[name="no_id_button"],
+input[name="pass_reset_button"] {
+  background-color: #FFFFFF;
   border-color: #555555;
+  color: #555555;
 }
 
-#edit-no-id-button:hover,
-#edit-no-member-button:hover {
-  background-color: #000000;
-  border-color: #000000;
+input[name="no_id_button"]:hover, 
+input[name="pass_reset_button"]:hover {
+  background-color: #555555;
+  border-color: #555555;
+  color: #ffffff;
 }

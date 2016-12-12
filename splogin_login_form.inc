@@ -11,12 +11,12 @@ function splogin_login_form($form, &$form_state) {
     drupal_goto($site_frontpage);
   }
 
-  if (!isset($form_state['storage']['destination'])) {
-    $destination = drupal_get_destination();
-    $form_state['storage']['destionation'] = $destination['destination'];
-  }
-
   form_load_include($form_state, 'inc', 'content', 'includes/password');
+
+  if (!isset($form_state['destination'])) {
+    $destination = drupal_get_destination();
+    $form_state['destination'] = $destination['destination'];
+  }
 
   $form['#attached']['css'] = array(
     drupal_get_path('module', 'splogin') . '/css/splogin.css',
@@ -26,13 +26,17 @@ function splogin_login_form($form, &$form_state) {
     $form_state['stages'][] = 'start';
   }
   $stage = end($form_state['stages']);
+
   $stored_data = (isset($form_state['stored_data'])) ? $form_state['stored_data'] : array();
+
+  $form['#prefix'] = '<div id="splogin-login-form-wrapper">';
+  $form['#suffix'] = '</div>';
 
   switch($stage) {
 
   case 'start':
 
-    $title = 'Welkom';
+    $title = 'Inloggen';
     $default = (isset($stored_data['contact_id'])) ? $stored_data['contact_id'] : '';
 
     $form['start_intro'] = array(
@@ -41,30 +45,28 @@ function splogin_login_form($form, &$form_state) {
 
     $form['contact_id'] = array(
       '#type'  => 'textfield',
-      '#title' => t('Relatie- of lidnummer'),
+      '#title' => t('Lidnummer'),
       '#default_value' => $default,
       '#size' => 8,
     );
 
     $form['no_id_button'] = array(
       '#type' => 'submit',
-      '#value' => 'Relatie- of lidnummer opvragen',
+      '#value' => 'Lidnummer opvragen',
       '#name' => 'no_id_button',
       '#weight' => 1,
-    );
-
-    $form['no_member_button'] = array(
-      '#type' => 'submit',
-      '#value' => 'Ik ben geen lid',
-      '#name' => 'no_member_button',
-      '#weight' => 2,
+      '#ajax' => array(
+        'callback' => 'splogin_login_form_ajax_callback',
+        'wrapper' => 'splogin-login-form-wrapper',
+        'event' => array('click'),
+      ),
     );
 
     break;
 
   case 'no_id':
 
-    $title = 'Opvragen relatie- of lidnummer';
+    $title = 'Opvragen lidnummer';
 
     $form['start_no_id'] = array(
       '#markup' => '<p>Vul onderstaand formulier in, dan geven we zo snel mogelijk je lidnummer door.</p>',
@@ -143,7 +145,7 @@ function splogin_login_form($form, &$form_state) {
     $default = (isset($stored_data['contact_id'])) ? $stored_data['contact_id'] : '';
     $form['contact_id'] = array(
       '#type'  => 'textfield',
-      '#title' => t('Relatie- of lidnummer'),
+      '#title' => t('Lidnummer'),
       '#default_value' => $default,
       '#size' => 8,
     );
@@ -194,13 +196,13 @@ function splogin_login_form($form, &$form_state) {
     $title = 'Controle persoonsgegevens';
 
     $form['check_id_intro'] = array(
-      '#markup' => '<p>We kunnen jouw gegevens niet terugvinden, weet je zeker dat het onderstaande relatie- of lidnummer correct is?<br/>(Corrigeren als dat niet het geval is.)</p>',
+      '#markup' => '<p>We kunnen jouw gegevens niet terugvinden, weet je zeker dat het onderstaande lidnummer correct is?<br/>(Corrigeren als dat niet het geval is.)</p>',
     );
 
     $default = (isset($stored_data['contact_id'])) ? $stored_data['contact_id'] : '';
     $form['new_contact_id'] = array(
       '#type'  => 'textfield',
-      '#title' => t('Relatie- of lidnummer'),
+      '#title' => t('Lidnummer'),
       '#default_value' => $default,
       '#size' => 8,
     );
@@ -317,15 +319,31 @@ function splogin_login_form($form, &$form_state) {
 
     break;
 
+  case 'finish':
+
+    $title = '';
+    $form['splogin_finish'] = array(
+      '#markup' => $form_state['finish_markup'],
+    );
+
+    break;
+
   }
 
-  $form['general_submit_button'] = array(
-    '#type' => 'submit',
-    '#value' => 'Volgende',
-    '#name' => 'general_submit_button',
-  );
+  if ($stage !== 'finish') {
+    $form['general_submit_button'] = array(
+      '#type' => 'submit',
+      '#value' => 'Volgende',
+      '#name' => 'general_submit_button',
+      '#ajax' => array(
+        'callback' => 'splogin_login_form_ajax_callback',
+        'wrapper' => 'splogin-login-form-wrapper',
+        'event' => array('click'),
+      ),
+    );
+  }
 
-  if (!in_array($stage, array('start', 'has_account'))) {
+  if (!in_array($stage, array('start', 'has_account', 'finish'))) {
     $form['back_button'] = array(
       '#type' => 'submit',
       '#value' => 'Terug',
@@ -333,7 +351,12 @@ function splogin_login_form($form, &$form_state) {
     );
   }
 
-  $form['#prefix'] = '<header class="content-header"><h1 class="title">' . $title . '</h1></header>';
+  if (!empty($title)) {
+    $form['title'] = array(
+      '#markup' => '<header class="content-header"><h1 class="title">' . $title . '</h1></header>',
+      '#weight' => '-1',
+    );
+  }
 
   return $form;
 }
@@ -356,7 +379,7 @@ function splogin_login_form_validate($form, &$form_state) {
 
       case 'start':
         if (filter_var($values['contact_id'], FILTER_VALIDATE_INT) === FALSE) {
-          form_set_error('contact_id', 'Vul een geldig relatie -of lidnummer in');
+          form_set_error('contact_id', 'Vul een geldig lidnummer in');
         }
         break;
 
@@ -404,10 +427,11 @@ function splogin_login_form_validate($form, &$form_state) {
         user_login_authenticate_validate($form, $form_state);
         user_login_final_validate($form, $form_state);
 
-        // Change error message.
-        if (!empty($_SESSION['messages']['error'])) {
+        // Change error message, and store original message in error log.
+        if (empty($form_state['uid'])) {
+          watchdog('splogin', 'Login failed:<pre>' . print_r($_SESSION['messages']['error'], TRUE) . '</pre>');
           $_SESSION['messages']['error'] = array(
-            '<p>Relatie- of lidnummer of  wachtwoord is niet correct.</p>',
+            '<p>Lidnummer of  wachtwoord is niet correct.</p>',
           );
         }
 
@@ -455,7 +479,7 @@ function splogin_login_form_validate($form, &$form_state) {
 
       case 'recheck_id':
         if (filter_var($values['new_contact_id'], FILTER_VALIDATE_INT) === FALSE) {
-          form_set_error('new_contact_id', 'Vul een geldig relatie -of lidnummer in');
+          form_set_error('new_contact_id', 'Vul een geldig lidnummer in');
         }
         break;
 
@@ -570,13 +594,13 @@ function splogin_login_form_submit($form, &$form_state) {
           }
         }
         else {
-          drupal_set_message('Het relatie- lidnummer is niet correct', 'error');
+          drupal_set_message('Het lidnummer is niet correct', 'error');
         }
         break;
 
       case 'no_id':
-        splogin_process_id_request($values);
-        return;
+        $result = splogin_process_id_request($form_state);
+        $stages[] = 'finish';
         break;
 
       case 'has_account':
@@ -590,11 +614,10 @@ function splogin_login_form_submit($form, &$form_state) {
             global $user;
             $user = user_load($drupal_account);
             user_login_finalize($user);
-            drupal_goto($storage['destination']);
           }
         }
         else {
-          drupal_set_message('Het wachtwoord of relatie- lidnummer is niet correct', 'error');
+          drupal_set_message('Het wachtwoord of lidnummer is niet correct', 'error');
         }
         break;
 
@@ -630,7 +653,7 @@ function splogin_login_form_submit($form, &$form_state) {
             }
           }
           else {
-            drupal_set_message('Dit relatie- of lidnummer is niet correct');
+            drupal_set_message('Dit lidnummer is niet correct', 'error');
             $stages = array();
             $stages[] = 'start';
           }
@@ -659,7 +682,8 @@ function splogin_login_form_submit($form, &$form_state) {
         break;
 
       case 'account_not_verified':
-        return;
+        splogin_send_account_not_verified_mail($form_state);
+        $stages[] = 'finish';
         break;
       }
 
@@ -667,10 +691,6 @@ function splogin_login_form_submit($form, &$form_state) {
 
     case 'no_id_button':
       $stages[] = 'no_id';
-      break;
-
-    case 'no_member_button':
-      drupal_goto('aanmelden/lid');
       break;
 
     case 'pass_reset_button':
@@ -695,4 +715,8 @@ function splogin_login_form_submit($form, &$form_state) {
   }
 
   $form_state['rebuild'] = TRUE;
+}
+
+function splogin_login_form_ajax_callback($form, &$form_state) {
+  return $form;
 }
