@@ -99,6 +99,20 @@ function splogin_login_form($form, &$form_state) {
       '#default_value' => $default,
     );
 
+    $default = (isset($stored_data['email'])) ? $stored_data['email'] : '';
+    $form['email'] = array(
+      '#type' => 'textfield',
+      '#title' => 'E-mailadres',
+      '#size' => 40,
+      '#default_value' => $default,
+    );
+
+    $form['telephone'] = array(
+      '#type' => 'textfield',
+      '#title' => 'Telefoonnummer',
+      '#size' => 14,
+    );
+
     $form['street_and_number'] = array(
       '#type' => 'textfield',
       '#title' => 'Adres',
@@ -117,20 +131,6 @@ function splogin_login_form($form, &$form_state) {
       '#type' => 'textfield',
       '#title' => 'Plaats',
       '#size' => 40,
-    );
-
-    $default = (isset($stored_data['email'])) ? $stored_data['email'] : '';
-    $form['email'] = array(
-      '#type' => 'textfield',
-      '#title' => 'E-mailadres',
-      '#size' => 40,
-      '#default_value' => $default,
-    );
-
-    $form['telephone'] = array(
-      '#type' => 'textfield',
-      '#title' => 'Telefoonnummer',
-      '#size' => 14,
     );
 
     $form['foreign_message'] = array(

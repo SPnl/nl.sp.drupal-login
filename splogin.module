@@ -673,7 +673,7 @@ function splogin_process_id_request(&$form_state) {
     }
   }
   $form_state['finish_markup'] = 'Onze administratie zal contact met u opnemen om uw lidnummer door te geven.';
-  // TODO: mailversturen administratie met gegevens met verzoek lidnummer door te geven.
+  drupal_mail('splogin', 'splogin_send_administration_request_contact_id', 'administratie@sp.nl', language_default(), $data, 'administratie@sp.nl');
   return FALSE;
 }
 
@@ -807,6 +807,21 @@ function splogin_mail($key, &$message, $params) {
     $message['body'][] = '<p>Lidnummer: ' . $params['contact_id'] . '</p>';
     $message['body'][] = '<p>Doorgegeven informatie:<br/>';
     $message['body'][] = 'Naam: ' . $name . '<br/>';
+    $message['body'][] = 'E-mailadres: ' . $params['email'] . '<br/>';
+    $message['body'][] = 'Telefoonnummer: ' . $params['telephone'] . '<br/>';
+    $message['body'][] = 'Adres: ' . $params['street_and_number'] . '<br/>';
+    $message['body'][] = 'Postcode: ' . $params['postal_code'] . '<br/>';
+    $message['body'][] = 'Plaats: ' . $params['locality'] . '</p>';
+    $message['body'][] = '<p>Met vriendelijke groet,<br/>SPNET</p>';
+    break;
+  case 'splogin_send_administration_request_contact_id':
+    $name = $params['first_name'] . ' ' . $params['middle_name'] . ' ' . $params['last_name'];
+    $message['subject'] = 'SPNET: Contactgegevens niet gevonden';
+    $message['body'][] = '<p>Beste administratie,</p>';
+    $message['body'][] = '<p>' . $name . ' heeft zijn lidnummer aangevraagd via SPNET. Het is niet gelukt om automatisch het lidnummer te vinden. Kunnen jullie contact opnemen met '  . $name . ' en zijn of haar lidnummer doorgeven indien deze lid is? En indien geen lid, dan contact opnemen om te kijken waarom deze dat denkt te zijn?</p>';
+    $message['body'][] = '<p>Doorgegeven informatie:<br/>';
+    $message['body'][] = 'Naam: ' . $name . '<br/>';
+    $message['body'][] = 'Geboortedatum: ' . $params['birth_date'] . '<br/>';
     $message['body'][] = 'E-mailadres: ' . $params['email'] . '<br/>';
     $message['body'][] = 'Telefoonnummer: ' . $params['telephone'] . '<br/>';
     $message['body'][] = 'Adres: ' . $params['street_and_number'] . '<br/>';
