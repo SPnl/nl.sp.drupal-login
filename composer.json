@@ -1,7 +1,7 @@
 {
-  "name": "SPnl/nl.sp.drupal-login",
+  "name": "spnl/nl.sp.drupal-login",
   "description": "Aanpassingen in de loginprocedure voor SPnet",
-  "type": "drupal-module",
+  "type": "drupal-custom-module",
   "authors": [
     {
       "name": "Kevin Levie",
