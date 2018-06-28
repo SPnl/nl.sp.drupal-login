@@ -108,6 +108,9 @@ function splogin_enable() {
   _splogin_create_field('field_email_primary', 'E-mailadres');
   _splogin_create_field('field_afdeling', 'Afdeling');
   _splogin_create_field('field_afdeling_id', 'Afdeling-ID');
+  _splogin_create_field('field_street_address', 'Adres');
+  _splogin_create_field('field_postal_code', 'Postcode');
+  _splogin_create_field('field_city', 'Woonplaats');
 }
 
 /**
@@ -419,7 +422,7 @@ function _splogin_update_profile(&$account) {
   try {
     $contact = civicrm_api3('Contact', 'getsingle', array(
       'id'     => $match['contact_id'],
-      'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
+      'return' => 'id,first_name,middle_name,last_name,display_name,phone,email,street_address,postal_code,city,' . $custom_field_voorletters . ',' . $custom_field_afdeling,
     ));
   } catch(CiviCRM_API3_Exception $e) {
     return false; // No match
@@ -456,6 +459,9 @@ function _splogin_update_profile(&$account) {
   $wrapped->field_last_name->set($contact['last_name']);
   $wrapped->field_phone_primary->set($contact['phone']);
   $wrapped->field_email_primary->set($contact['email']);
+  $wrapped->field_street_address->set($contact['street_address']);
+  $wrapped->field_postal_code->set($contact['postal_code']);
+  $wrapped->field_city->set($contact['city']);
   $wrapped->field_afdeling_id->set($afdeling_id);
   $wrapped->field_afdeling->set($afdeling);
   //$wrapped->save();
