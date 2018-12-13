@@ -5,6 +5,23 @@
  * -------------------------------------------------------------------------- */
 
 /**
+ * Implements hook_form_alter().
+ */
+function splogin_form_alter(&$form, &$form_state, $form_id) {
+
+  // Replace username with 'lidnummer' on forms title / label
+  // Use lidnummer as login forms title / label
+  
+  if($form_id == 'user_login') {
+        $form['name']["#title"] = "Lidnummer";
+  }
+
+  if($form_id == 'user_pass') {
+        $form['name']["#title"] = "Lidnummer of e-mailadres";
+  }
+}
+
+/**
  * Implements hook_page_delivery_callback_alter.
  * Redirect naar /user als gebruiker niet ingelogd is en op een afgeschermde pagina komt.
  */
