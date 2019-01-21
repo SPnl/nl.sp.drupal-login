@@ -647,19 +647,17 @@ function splogin_process_id_request(&$form_state) {
   $data = spcivipush_parse_data($data);
 
   if (!empty($data)) {
-    $same_contacts = spcivipush_find_same_contacts($data, $debug_info);
-    if (!empty($same_contacts) && count($same_contacts) === 1) {
-      $data['contact_id'] = current($same_contacts);
-      $form_state['finish_markup'] = '<p>Uw lidnummer is per e-mail naar u opgestuurd. Mocht u geen mail ontvangen, neem dan contact op met onze administratie: tel (+31) (0)88 243 55 40.</p>';
-
-      $civicrm_contact_data = splogin_get_civi_contact($data['contact_id']);
+    $civicrm_contact_data = spcivipush_find_existing_contact($data, $debug_info);
+    if (!empty($civicrm_contact_data)) {
+      $data['contact_id'] = $civicrm_contact_data['contact_id'];
       if (!empty($civicrm_contact_data['email'])) {
         // Send email to CiviCRM contact with id.
         drupal_mail('splogin', 'splogin_send_id_to_contact', $civicrm_contact_data['email'], language_default(), $data, 'administratie@sp.nl');
+        $form_state['finish_markup'] = '<p>Uw lidnummer is per e-mail naar u opgestuurd. Mocht u geen mail ontvangen, neem dan contact op met onze administratie: tel (+31) (0)88 243 55 40.</p>';
+
         // Check if contact data might have changed.
         if (
           spcivipush_valid_email($civicrm_contact_data['email']) !== $data['email'] ||
-          $civimail !== $data['email'] ||
           spcivipush_valid_telephone($civicrm_contact_data['phone']) !== $data['telephone'] ||
           $civicrm_contact_data['street_address'] !== $data['street_and_number'] ||
           spcivipush_valid_postal_code($civicrm_contact_data['postal_code']) !== $data['postal_code'] ||
@@ -837,7 +835,7 @@ function splogin_new_civi_email($data) {
     drupal_set_message('Kon niet verbinden met CiviCRM', 'error');
     return FALSE;
   }
-  _splogin_new_setemail($data, $data['email']); 
+  _splogin_new_setemail($data, $data['email']);
 }
 
 function splogin_new_create_account($stored_data) {
@@ -847,4 +845,3 @@ function splogin_new_create_account($stored_data) {
     drupal_set_message('Er is een email naar u verzonden met verdere instructies om toegang te krijgen tot SPNET');
   }
 }
-
