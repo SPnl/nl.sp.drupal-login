@@ -182,11 +182,11 @@ function splogin_new_form($form, &$form_state) {
   case 'start':
 
     $form['descr'] = array(
-      '#markup' => '<h3>Nieuw account</h3><p>Voer uw lidnummer of relatienummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>',
+      '#markup' => '<h3>Nieuw account</h3><p>Voer uw lidnummer, uw postcode en uw geboortedatum in om een account aan te maken.</p>',
     );
     $form['civicrm_id'] = array(
       '#type'  => 'textfield',
-      '#title' => t('Relatienummer'),
+      '#title' => t('Lidnummer'),
     );
     $form['postcode'] = array(
       '#type'  => 'textfield',
